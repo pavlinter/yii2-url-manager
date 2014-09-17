@@ -15,7 +15,7 @@ use yii\helpers\ArrayHelper;
  *
  * @author Pavels Radajevs <pavlinter@gmail.com>
  * @since 1.0
- * @last-commit 3a1e0f3a5c6f75ed08bb8cea321c2391045bc804#diff-5ee57ea516b11a9064564ca7291d6bde
+ * @last-commit 48821a8c2cc274cb842d6e5c800e438c3e04b14a
  */
 class UrlManager extends \yii\web\UrlManager
 {
@@ -164,9 +164,7 @@ class UrlManager extends \yii\web\UrlManager
             }
 
             if (!empty($params)) {
-                foreach ($params as $key => $value) {
-                    $route .= '/' . $key . '/' . $value;
-                }
+                $route .= $this->paramsToUrl($params);
             }
 
             if ($this->suffix !== null) {
@@ -223,5 +221,42 @@ class UrlManager extends \yii\web\UrlManager
             }
         }
         return $params;
+    }
+
+    public function paramsToUrl($params)
+    {
+        $route = '';
+
+        foreach ($params as $key => $value) {
+
+            if (is_array($value)) {
+                foreach ($value as $k => $v) {
+                    $route .= $this->arrayToUrl($k, $v, $key);
+                }
+            } else {
+                $route .= '/' . $key . '/' . $value;
+            }
+        }
+
+        return $route;
+    }
+
+    public function arrayToUrl($key, $value , $firstKey = null)
+    {
+        $route = '';
+        if (is_array($value)) {
+            foreach ($value as $k => $v) {
+                if ($firstKey !== null) {
+                    $route .= '/' . $firstKey;
+                }
+                $route .= '[' . $key . ']' . $this->arrayToUrl($k, $v);
+            }
+        } else {
+            if ($firstKey !== null) {
+                $route .= '/' . $firstKey;
+            }
+            $route .= '[' . $key . ']' . '/' . $value;
+        }
+        return $route;
     }
 }
