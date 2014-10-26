@@ -16,7 +16,6 @@ use yii\helpers\ArrayHelper;
  *
  * @author Pavels Radajevs <pavlinter@gmail.com>
  * @since 1.0
- * @last-commit f010fb57b4cb3ebc3f8b1d65c5f85d166110fff9
  */
 class UrlRule extends \yii\web\UrlRule
 {
@@ -160,7 +159,7 @@ class UrlRule extends \yii\web\UrlRule
         $suffix = (string) ($this->suffix === null ? $manager->suffix : $this->suffix);
         if ($suffix !== '' && $pathInfo !== '') {
             $n = strlen($suffix);
-            if (substr_compare($pathInfo, $suffix, -$n) === 0) {
+            if (substr_compare($pathInfo, $suffix, -$n, $n) === 0) {
                 $pathInfo = substr($pathInfo, 0, -$n);
                 if ($pathInfo === '') {
                     // suffix alone is not allowed

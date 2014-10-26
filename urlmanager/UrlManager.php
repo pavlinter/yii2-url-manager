@@ -15,7 +15,6 @@ use yii\helpers\ArrayHelper;
  *
  * @author Pavels Radajevs <pavlinter@gmail.com>
  * @since 1.0
- * @last-commit 48821a8c2cc274cb842d6e5c800e438c3e04b14a
  */
 class UrlManager extends \yii\web\UrlManager
 {
@@ -71,7 +70,7 @@ class UrlManager extends \yii\web\UrlManager
             $suffix = (string) $this->suffix;
             if ($suffix !== '' && $pathInfo !== '') {
                 $n = strlen($this->suffix);
-                if (substr_compare($pathInfo, $this->suffix, -$n) === 0) {
+                if (substr_compare($pathInfo, $this->suffix, -$n, $n) === 0) {
                     $pathInfo = substr($pathInfo, 0, -$n);
                     if ($pathInfo === '') {
                         // suffix alone is not allowed
