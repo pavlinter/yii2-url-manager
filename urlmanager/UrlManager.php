@@ -25,23 +25,23 @@ class UrlManager extends \yii\web\UrlManager
 	 */
 	public function init()
 	{
-
         parent::init();
         if (Yii::$app->request->getIsConsoleRequest()) {
             return true;
         }
+        $request  = Yii::$app->getRequest();
+        $pathInfo = rtrim($request->getPathInfo(), '/');
         if ($this->enableLang) {
-            $request  = Yii::$app->getRequest();
-            $pathInfo = $request->getPathInfo();
             if ($pathInfo !== "") {
                 if (strpos($pathInfo, '/') !== false) {
                     $segments = explode('/', $pathInfo);
                     $_GET[$this->langParam] = $segments['0'];
                     unset($segments['0']);
-                    $request->setPathInfo(join('/', $segments));
+                    $pathInfo = join('/', $segments);
                 }
             }
 		}
+        $request->setPathInfo($pathInfo);
 	}
 
     /**
@@ -102,7 +102,7 @@ class UrlManager extends \yii\web\UrlManager
         $params = [];
 
         if (strpos($pathInfo, '/') !== false) {
-            $segments = explode('/', trim($pathInfo, '/'));
+            $segments = explode('/', $pathInfo);
             $n = count($segments);
             $modules = Yii::$app->getModules();
             $pathInfoStart = 2;
