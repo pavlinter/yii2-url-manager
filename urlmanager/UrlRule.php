@@ -272,11 +272,9 @@ class UrlRule extends \yii\web\UrlRule
         } elseif (strpos($url, '//') !== false) {
             $url = preg_replace('#/+#', '/', $url);
         }
-
         if ($url !== '') {
             $url .= ($this->suffix === null ? $manager->suffix : $this->suffix);
         }
-
         if ($manager->enableLang) {
             if (isset($params[$manager->langParam])) {
                 $url = $params[$manager->langParam].'/'.$url;
@@ -285,23 +283,45 @@ class UrlRule extends \yii\web\UrlRule
                 $url = Yii::$app->language.'/'.$url;
             }
         }
-
         if ($this->paramsAfter !== null) {
             if (!empty($params)) {
-                foreach ($params as $key => $value) {
-                    if (isset($this->defaults[$key])) {
-                        continue;
+                $query = '';
+                if ($manager->onlyFriendlyParams) {
+                    foreach ($params as $key => $value) {
+                        if (isset($this->defaults[$key])) {
+                            continue;
+                        }
+                        if (is_array($value)) {
+                            $value = $manager->arrayToUrl($key, $value);
+                        }
+                        $url .= '/' . $key . '/' . $value;
                     }
-                    $url .= '/' . $key . '/' . $value;
+                } else {
+                    $gets = [];
+                    foreach ($params as $key => $value) {
+                        if (isset($manager->gets[$key])) {
+                            $gets[$key] = $value;
+                            continue;
+                        }
+                        if (isset($this->defaults[$key])) {
+                            continue;
+                        }
+                        if (is_array($value)) {
+                            $value = $manager->arrayToUrl($key, $value);
+                        }
+                        $url .= '/' . $key . '/' . $value;
+                    }
+                    if (!empty($gets) && ($query = http_build_query($gets)) !== '') {
+                        $query = '?' . $query;
+                    }
                 }
-                $url = trim($url, '/');
+                $url = trim($url, '/') . $query;
             }
         } else {
             if (!empty($params) && ($query = http_build_query($params)) !== '') {
                 $url .= '?' . $query;
             }
         }
-
         return $url;
     }
 }

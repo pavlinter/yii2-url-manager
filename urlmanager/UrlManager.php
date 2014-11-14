@@ -20,6 +20,8 @@ class UrlManager extends \yii\web\UrlManager
 {
     public $enableLang = false;
     public $langParam  = 'lang';
+    public $onlyFriendlyParams = false;
+    public $gets = [];
 	/**
 	 * Initializes UrlManager.
 	 */
@@ -41,6 +43,11 @@ class UrlManager extends \yii\web\UrlManager
                 }
             }
 		}
+        if (isset($_GET)) {
+            foreach ($_GET as $k => $v) {
+                $this->gets[$k] = $v;
+            }
+        }
         $request->setPathInfo($pathInfo);
 	}
 
@@ -166,8 +173,19 @@ class UrlManager extends \yii\web\UrlManager
                 }
             }
 
+            $gets = [];
             if (!empty($params)) {
+                if (!$this->onlyFriendlyParams) {
+                    foreach ($this->gets as $k => $v) {
+                        if (isset($params[$k])) {
+                            $gets[$k] = ArrayHelper::remove($params, $k);
+                        }
+                    }
+                }
                 $route .= $this->paramsToUrl($params);
+            }
+            if (!empty($gets) && ($query = http_build_query($gets)) !== '') {
+                $route .= '?' . $query;
             }
 
             if ($this->suffix !== null) {
