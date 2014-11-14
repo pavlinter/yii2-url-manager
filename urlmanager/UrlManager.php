@@ -142,7 +142,7 @@ class UrlManager extends \yii\web\UrlManager
         $route = trim($params[0], '/');
         unset($params[0]);
 
-        if (isset($params['_pjax'])) {
+        if ($this->onlyFriendlyParams && isset($params['_pjax'])) {
             unset($params['_pjax']);
         }
 
