@@ -22,6 +22,7 @@ class UrlManager extends \yii\web\UrlManager
     public $langParam  = 'lang';
     public $onlyFriendlyParams = false;
     public $gets = [];
+    public $langBegin = []; //['en', 'fr']  if empty array request http://domain.com/en show Not Found
 	/**
 	 * Initializes UrlManager.
 	 */
@@ -34,13 +35,19 @@ class UrlManager extends \yii\web\UrlManager
         $request  = Yii::$app->getRequest();
         $pathInfo = rtrim($request->getPathInfo(), '/');
         if ($this->enableLang) {
-            if ($pathInfo !== "") {
+
+            if ($pathInfo != '') {
                 if (strpos($pathInfo, '/') !== false) {
+
                     $segments = explode('/', $pathInfo);
                     $_GET[$this->langParam] = $segments['0'];
                     unset($segments['0']);
                     $pathInfo = join('/', $segments);
+                } else if(in_array($pathInfo, $this->langBegin)) {
+                    $_GET[$this->langParam] = $pathInfo;
+                    $pathInfo = '';
                 }
+
             }
 		}
         if (isset($_GET)) {
@@ -105,30 +112,30 @@ class UrlManager extends \yii\web\UrlManager
     }
     public function parseUrl($pathInfo)
     {
-
         $params = [];
-
         if (strpos($pathInfo, '/') !== false) {
             $segments = explode('/', $pathInfo);
             $n = count($segments);
             $modules = Yii::$app->getModules();
             $pathInfoStart = 2;
-            if (isset($modules[$segments['0']])) {
-                $pathInfoStart = 3;
+            foreach ($segments as $segment) {
+                if (isset($modules[$segment])) {
+                    $pathInfoStart++;
+                    if (isset($modules[$segment]['modules'])) {
+                        $modules = $modules[$segment]['modules'];
+                    } else {
+                        $modules = [];
+                    }
+                } else {
+                    break;
+                }
             }
             if ( $n > $pathInfoStart){
-                if($pathInfoStart === 3){
-                    $pathInfo = $segments['0'] . '/' . $segments['1'] . '/' . $segments['2'];
-                    unset($segments['0'], $segments['1'], $segments['2']);
-                }else{
-                    $pathInfo = $segments['0'] . '/' . $segments['1'];
-                    unset($segments['0'], $segments['1']);
-                }
-
+                $pathInfo = implode('/', array_slice($segments,0, $pathInfoStart));
+                $segments = array_slice($segments,$pathInfoStart);
                 $params = $this->createPrettyUrl($segments);
             }
         }
-
         return [$pathInfo, $params];
     }
     public function createUrl($params)
