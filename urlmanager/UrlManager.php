@@ -149,6 +149,8 @@ class UrlManager extends \yii\web\UrlManager
         $route = trim($params[0], '/');
         unset($params[0]);
 
+        $standartParams = ArrayHelper::remove($params, '?', []);
+
         if ($this->onlyFriendlyParams && isset($params['_pjax'])) {
             unset($params['_pjax']);
         }
@@ -191,15 +193,19 @@ class UrlManager extends \yii\web\UrlManager
                 }
                 $route .= $this->paramsToUrl($params);
             }
-            if (!empty($gets) && ($query = http_build_query($gets)) !== '') {
-                $route .= '?' . $query;
+
+            $gets = ArrayHelper::merge($gets, $standartParams);
+
+            $query = '';
+            if (!empty($gets) && ($q = http_build_query($gets)) !== '') {
+                $query .= '?' . $q;
             }
 
             if ($this->suffix !== null) {
                 $route .= $this->suffix;
-                return "$baseUrl/{$route}{$this->suffix}{$anchor}";
+                return "$baseUrl/{$route}{$this->suffix}{$query}{$anchor}";
             } else {
-                return "$baseUrl/{$route}{$anchor}";
+                return "$baseUrl/{$route}{$query}{$anchor}";
             }
         } else {
             $url = "$baseUrl?{$this->routeParam}=" . urlencode($route);
