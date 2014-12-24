@@ -117,11 +117,14 @@ class UrlManager extends \yii\web\UrlManager
             $segments = explode('/', $pathInfo);
             $n = count($segments);
             $modules = Yii::$app->getModules();
+
             $pathInfoStart = 2;
             foreach ($segments as $segment) {
                 if (isset($modules[$segment])) {
                     $pathInfoStart++;
-                    if (isset($modules[$segment]['modules'])) {
+                    if (is_object($modules[$segment])) {
+                        $modules = $modules[$segment]->getModules();
+                    } else if (isset($modules[$segment]['modules'])) {
                         $modules = $modules[$segment]['modules'];
                     } else {
                         $modules = [];
