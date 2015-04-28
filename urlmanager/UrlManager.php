@@ -271,7 +271,9 @@ class UrlManager extends \yii\web\UrlManager
                     $route .= $this->arrayToUrl($k, $v, $key);
                 }
             } else {
-                $route .= '/' . $key . '/' . $value;
+                if ($value !== null) {
+                    $route .= '/' . $key . '/' . $value;
+                }
             }
         }
 
