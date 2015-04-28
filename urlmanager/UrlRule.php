@@ -3,7 +3,7 @@
 /**
  * @copyright Copyright &copy; Pavels Radajevs, 2014
  * @package yii2-url-manager
- * @version 1.0.0
+ * @version 1.0.1
  */
 
 namespace pavlinter\urlmanager;
@@ -15,7 +15,6 @@ use yii\helpers\ArrayHelper;
 /**
  *
  * @author Pavels Radajevs <pavlinter@gmail.com>
- * @since 1.0
  */
 class UrlRule extends \yii\web\UrlRule
 {
