@@ -17,6 +17,8 @@ use yii\helpers\ArrayHelper;
  */
 class UrlManager extends \yii\web\UrlManager
 {
+    const EVENT_INIT = 'init';
+
     public $enableLang = false;
     public $langParam  = 'lang';
     public $onlyFriendlyParams = false;
@@ -49,12 +51,20 @@ class UrlManager extends \yii\web\UrlManager
 
             }
 		}
+
+        $event = new UrlManagerEvent([
+            'pathInfo' => $pathInfo,
+        ]);
+
+        $this->trigger(self::EVENT_INIT, $event);
+
         if (isset($_GET)) {
             foreach ($_GET as $k => $v) {
                 $this->gets[$k] = $v;
             }
         }
-        $request->setPathInfo($pathInfo);
+
+        $request->setPathInfo($event->pathInfo);
 	}
 
     /**
