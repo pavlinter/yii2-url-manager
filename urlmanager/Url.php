@@ -55,9 +55,9 @@ class Url extends \yii\helpers\BaseUrl
     {
         $langBegin = Yii::$app->getUrlManager()->langBegin;
         if (isset($langBegin['0']) && $langBegin['0'] === Yii::$app->language) {
-            return Url::to('/' . $params);
+            return Url::to('@web/' . $params);
         } else {
-            return Url::to('/' . Yii::$app->language . '/' . $params);
+            return Url::to('@web/' . Yii::$app->language . '/' . $params);
         }
     }
 }
