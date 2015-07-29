@@ -48,6 +48,7 @@ class Url extends \yii\helpers\BaseUrl
     }
 
     /**
+     * @param string $params
      * @return string
      */
     public static function getLangUrl($params = '')
