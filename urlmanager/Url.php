@@ -46,4 +46,17 @@ class Url extends \yii\helpers\BaseUrl
 
         return static::toRoute($route, $scheme);
     }
+
+    /**
+     * @return string
+     */
+    public static function getLangUrl($params = '')
+    {
+        $langBegin = Yii::$app->getUrlManager()->langBegin;
+        if (isset($langBegin['0']) && $langBegin['0'] === Yii::$app->language) {
+            return Url::to('/' . $params);
+        } else {
+            return Url::to('/' . Yii::$app->language . '/' . $params);
+        }
+    }
 }
