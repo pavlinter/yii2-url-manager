@@ -26,19 +26,17 @@ class Url extends \yii\helpers\BaseUrl
     {
         $currentParams = Yii::$app->getRequest()->getQueryParams();
         if (isset($params[0])) {
-            $currentParams[0] = static::normalizeRoute($params[0]);
-            unset($params[0]);
+            $currentParams[0] = ArrayHelper::remove($params, 0);
         } else {
             $currentParams[0] = '/' . Yii::$app->controller->getRoute();
         }
 
         if($strict){
             $params = ArrayHelper::merge($currentParams, $params);
-            $route['0'] = ArrayHelper::remove($params, '0');
+            $route[0] = ArrayHelper::remove($params, 0);
             if(Yii::$app->urlManager instanceof UrlManager){
                 ArrayHelper::remove($params, Yii::$app->urlManager->langParam);
             }
-
             $route['?'] = $params;
         } else {
             $route = ArrayHelper::merge($currentParams, $params);
