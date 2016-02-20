@@ -9,6 +9,7 @@
 namespace pavlinter\urlmanager;
 
 use Yii;
+use yii\db\Query;
 use yii\helpers\ArrayHelper;
 
 /**
@@ -23,8 +24,19 @@ class UrlManager extends \yii\web\UrlManager
     public $langParam  = 'lang';
     public $onlyFriendlyParams = false;
     public $gets = [];
-    public $langBegin = []; //['en', 'fr']  if empty array request http://domain.com/en show Not Found
-	/**
+
+    public $langBegin; //['en', 'fr']
+
+    public $db = 'db';
+    public $enableCaching = true;
+    public $durationCaching;
+    public $codeField = 'code';
+    public $updatedAtField = 'updated_at';
+    public $table = '{{%language}}';
+    public $condition = ['active' => 1];
+    public $orderBy = ['weight' => SORT_ASC];
+
+    /**
 	 * Initializes UrlManager.
 	 */
 	public function init()
@@ -33,6 +45,10 @@ class UrlManager extends \yii\web\UrlManager
         if (Yii::$app->request->getIsConsoleRequest()) {
             return true;
         }
+
+        //set $this->langBegin is empty
+        $this->setLangBegin();
+
         $request  = Yii::$app->getRequest();
         $pathInfo = rtrim($request->getPathInfo(), '/');
         if ($this->enableLang) {
@@ -45,10 +61,13 @@ class UrlManager extends \yii\web\UrlManager
                     unset($segments['0']);
                     $pathInfo = join('/', $segments);
                 } else if(in_array($pathInfo, $this->langBegin)) {
+
                     $_GET[$this->langParam] = $pathInfo;
                     $pathInfo = '';
                 }
 
+            } else {
+                $_GET[$this->langParam] = reset($this->langBegin);
             }
 		}
 
@@ -69,7 +88,7 @@ class UrlManager extends \yii\web\UrlManager
 
     /**
      * Parses the user request.
-     * @param Request $request the request component
+     * @param \yii\web\Request $request the request component
      * @return array|boolean the route and the associated parameters. The latter is always empty
      * if [[enablePrettyUrl]] is false. False is returned if the current request cannot be successfully parsed.
      */
@@ -119,6 +138,11 @@ class UrlManager extends \yii\web\UrlManager
             return [(string) $route, []];
         }
     }
+
+    /**
+     * @param $pathInfo
+     * @return array
+     */
     public function parseUrl($pathInfo)
     {
         $params = [];
@@ -150,6 +174,12 @@ class UrlManager extends \yii\web\UrlManager
         }
         return [$pathInfo, $params];
     }
+
+    /**
+     * @param array|string $params
+     * @return string
+     * @throws \yii\base\InvalidConfigException
+     */
     public function createUrl($params)
     {
 
@@ -230,6 +260,10 @@ class UrlManager extends \yii\web\UrlManager
         }
     }
 
+    /**
+     * @param $segments
+     * @return array
+     */
     public function createPrettyUrl($segments)
     {
         $params = [];
@@ -269,6 +303,10 @@ class UrlManager extends \yii\web\UrlManager
         return $params;
     }
 
+    /**
+     * @param $params
+     * @return string
+     */
     public function paramsToUrl($params)
     {
         $route = '';
@@ -289,6 +327,12 @@ class UrlManager extends \yii\web\UrlManager
         return $route;
     }
 
+    /**
+     * @param $key
+     * @param $value
+     * @param null $firstKey
+     * @return string
+     */
     public function arrayToUrl($key, $value , $firstKey = null)
     {
         $route = '';
@@ -306,5 +350,48 @@ class UrlManager extends \yii\web\UrlManager
             $route .= '[' . $key . ']' . '/' . $value;
         }
         return $route;
+    }
+
+    public function setLangBegin()
+    {
+        if(!$this->langBegin){
+            $key = static::className() . 'langBegin';
+            $this->langBegin = $this->cache->get($key);
+            if($this->langBegin === false){
+                $query = new Query();
+                $query->select(['c' => $this->codeField])->from($this->table);
+
+                if ($this->condition) {
+                    $query->where($this->condition);
+                }
+                if ($this->orderBy) {
+                    $query->orderBy($this->orderBy);
+                }
+                $this->langBegin = ArrayHelper::getColumn($query->all($this->getDb()), 'c');
+            }
+
+            if ($this->enableCaching) {
+                if ($this->durationCaching !== null) {
+                    $this->cache->set($key, $this->langBegin, $this->durationCaching);
+                } else {
+                    $query = new Query();
+                    $sql = $query->select('COUNT(*),MAX(' . $this->updatedAtField . ')')
+                        ->from($this->table)
+                        ->createCommand($this->getDb())
+                        ->getRawSql();
+                    $this->cache->set($key, $this->langBegin, $this->durationCaching, new \yii\caching\DbDependency([
+                        'sql' => $sql,
+                    ]));
+                }
+            }
+        }
+    }
+
+    /**
+     * @return \yii\db\Connection
+     */
+    public function getDb()
+    {
+        return Yii::$app->get($this->db);
     }
 }
