@@ -25,7 +25,7 @@ class UrlManager extends \yii\web\UrlManager
     public $onlyFriendlyParams = false;
     public $gets = [];
 
-    public $langBegin; //['en', 'fr']
+    public $langBegin; //['en', 'fr'] if null langBegin load from db
 
     public $db = 'db';
     public $enableCaching = true;
