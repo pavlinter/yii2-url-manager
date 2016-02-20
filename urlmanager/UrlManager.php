@@ -3,7 +3,7 @@
 /**
  * @copyright Copyright &copy; Pavels Radajevs, 2014
  * @package yii2-url-manager
- * @version 1.0.4
+ * @version 1.1.0
  */
 
 namespace pavlinter\urlmanager;
