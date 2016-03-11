@@ -24,6 +24,17 @@ class Url extends \yii\helpers\BaseUrl
      */
     public static function current(array $params = [], $scheme = false, $strict = false)
     {
+        $route = static::currentArray($params, $strict);
+        return static::toRoute($route, $scheme);
+    }
+
+    /**
+     * @param array $params
+     * @param bool $strict only through "?"
+     * @return array
+     */
+    public static function currentArray(array $params = [], $strict = false)
+    {
         $currentParams = Yii::$app->getRequest()->getQueryParams();
         if (isset($params[0])) {
             $currentParams[0] = ArrayHelper::remove($params, 0);
@@ -42,7 +53,7 @@ class Url extends \yii\helpers\BaseUrl
             $route = ArrayHelper::merge($currentParams, $params);
         }
 
-        return static::toRoute($route, $scheme);
+        return $route;
     }
 
     /**
