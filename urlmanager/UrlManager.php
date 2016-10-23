@@ -11,6 +11,8 @@ namespace pavlinter\urlmanager;
 use Yii;
 use yii\db\Query;
 use yii\helpers\ArrayHelper;
+use yii\web\NotFoundHttpException;
+use yii\web\Request;
 
 /**
  *
@@ -36,6 +38,8 @@ class UrlManager extends \yii\web\UrlManager
     public $condition = ['active' => 1];
     public $orderBy = ['weight' => SORT_ASC];
 
+    public $normalized = false;
+
     /**
 	 * Initializes UrlManager.
 	 */
@@ -50,7 +54,29 @@ class UrlManager extends \yii\web\UrlManager
         $this->setLangBegin();
 
         $request  = Yii::$app->getRequest();
-        $pathInfo = rtrim($request->getPathInfo(), '/');
+
+        if ($this->normalizer !== false) {
+            $pathInfo = $this->normalizer->normalizePathInfo($request->getPathInfo(), (string) $this->suffix, $this->normalized);
+        } else {
+            $pathInfo = rtrim($request->getPathInfo(), '/');
+        }
+
+        $suffix = (string) $this->suffix;
+        if ($suffix !== '' && $pathInfo !== '') {
+            $n = strlen($this->suffix);
+            if (substr_compare($pathInfo, $this->suffix, -$n, $n) === 0) {
+                $pathInfo = substr($pathInfo, 0, -$n);
+                if ($pathInfo === '') {
+                    // suffix alone is not allowed
+                    throw new NotFoundHttpException(Yii::t('yii', 'Page not found.'));
+                }
+            } else {
+                // suffix doesn't match
+                throw new NotFoundHttpException(Yii::t('yii', 'Page not found.'));
+            }
+        }
+
+
         if ($this->enableLang) {
 
             if ($pathInfo != '') {
@@ -88,15 +114,15 @@ class UrlManager extends \yii\web\UrlManager
 
     /**
      * Parses the user request.
-     * @param \yii\web\Request $request the request component
+     * @param Request $request the request component
      * @return array|boolean the route and the associated parameters. The latter is always empty
      * if [[enablePrettyUrl]] is false. False is returned if the current request cannot be successfully parsed.
      */
     public function parseRequest($request)
     {
         if ($this->enablePrettyUrl) {
-            $pathInfo = $request->getPathInfo();
             /* @var $rule UrlRule */
+            $pathInfo = $request->getPathInfo();
             foreach ($this->rules as $rule) {
                 if (($result = $rule->parseRequest($this, $request)) !== false) {
                     return $result;
@@ -109,25 +135,17 @@ class UrlManager extends \yii\web\UrlManager
 
             Yii::trace('No matching URL rules. Using default URL parsing logic.', __METHOD__);
 
-            $suffix = (string) $this->suffix;
-            if ($suffix !== '' && $pathInfo !== '') {
-                $n = strlen($this->suffix);
-                if (substr_compare($pathInfo, $this->suffix, -$n, $n) === 0) {
-                    $pathInfo = substr($pathInfo, 0, -$n);
-                    if ($pathInfo === '') {
-                        // suffix alone is not allowed
-                        return false;
-                    }
-                } else {
-                    // suffix doesn't match
-                    return false;
-                }
+            if ($pathInfo) {
+                $result = $this->parseUrl($pathInfo);
+            } else {
+                $result = [$pathInfo, []];
             }
 
-            if ($pathInfo) {
-                return $this->parseUrl($pathInfo);
+            if ($this->normalized) {
+                return $this->normalizer->normalizeRoute($result);
+            } else {
+                return $result;
             }
-            return [$pathInfo, []];
         } else {
             Yii::trace('Pretty URL not enabled. Using default URL parsing logic.', __METHOD__);
             $route = $request->getQueryParam($this->routeParam, '');
@@ -182,9 +200,7 @@ class UrlManager extends \yii\web\UrlManager
      */
     public function createUrl($params)
     {
-
         $params = (array) $params;
-
         $anchor = isset($params['#']) ? '#' . $params['#'] : '';
         unset($params['#'], $params[$this->routeParam]);
 
@@ -242,9 +258,8 @@ class UrlManager extends \yii\web\UrlManager
             if (!empty($gets) && ($q = http_build_query($gets)) !== '') {
                 $query .= '?' . $q;
             }
-
+            
             if ($this->suffix !== null) {
-                $route .= $this->suffix;
                 return "$baseUrl/{$route}{$this->suffix}{$query}{$anchor}";
             } else {
                 return "$baseUrl/{$route}{$query}{$anchor}";
