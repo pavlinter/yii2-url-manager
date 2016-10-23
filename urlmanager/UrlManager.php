@@ -12,7 +12,6 @@ use Yii;
 use yii\db\Query;
 use yii\helpers\ArrayHelper;
 use yii\web\NotFoundHttpException;
-use yii\web\UrlNormalizer;
 
 /**
  *
@@ -44,28 +43,9 @@ class UrlManager extends \yii\web\UrlManager
      */
     public $ruleConfig = ['class' => 'pavlinter\urlmanager\UrlRule'];
 
-    /**
-     * @var UrlNormalizer|array|string|false the configuration for [[UrlNormalizer]] used by this UrlManager.
-     * The default value is `false`, which means normalization will be skipped.
-     * If you wish to enable URL normalization, you should configure this property manually.
-     * For example:
-     *
-     * ```php
-     * [
-     *     'class' => 'yii\web\UrlNormalizer',
-     *     'collapseSlashes' => true,
-     *     'normalizeTrailingSlash' => true,
-     * ]
-     * ```
-     *
-     * @since 2.0.10
-     */
-    public $normalizer = [
-        'class' => 'yii\web\UrlNormalizer',
-        'action' => UrlNormalizer::ACTION_REDIRECT_TEMPORARY,
-    ];
-
     public $normalized = false;
+
+    private $_pathInfo;
 
     /**
 	 * Initializes UrlManager.
@@ -82,10 +62,16 @@ class UrlManager extends \yii\web\UrlManager
 
         $request  = Yii::$app->getRequest();
 
+        $sourcePathInfo = $request->getPathInfo();
+        $endSlash = '';
+
         if ($this->normalizer !== false) {
-            $pathInfo = $this->normalizer->normalizePathInfo($request->getPathInfo(), (string) $this->suffix, $this->normalized);
+            $pathInfo = $this->normalizer->normalizePathInfo($sourcePathInfo, (string) $this->suffix, $this->normalized);
+            if ($sourcePathInfo !== $pathInfo) {
+                $endSlash = '/';
+            }
         } else {
-            $pathInfo = rtrim($request->getPathInfo(), '/');
+            $pathInfo = rtrim($sourcePathInfo, '/');
         }
 
         $suffix = (string) $this->suffix;
@@ -135,8 +121,8 @@ class UrlManager extends \yii\web\UrlManager
                 $this->gets[$k] = $v;
             }
         }
-
-        $request->setPathInfo($event->pathInfo);
+        $request->setPathInfo($event->pathInfo . $endSlash);
+        $this->_pathInfo = $event->pathInfo;
 	}
 
     /**
@@ -149,7 +135,7 @@ class UrlManager extends \yii\web\UrlManager
     {
         if ($this->enablePrettyUrl) {
             /* @var $rule UrlRule */
-            $pathInfo = $request->getPathInfo();
+
             foreach ($this->rules as $rule) {
                 if (($result = $rule->parseRequest($this, $request)) !== false) {
                     return $result;
@@ -161,7 +147,7 @@ class UrlManager extends \yii\web\UrlManager
             }
 
             Yii::trace('No matching URL rules. Using default URL parsing logic.', __METHOD__);
-
+            $pathInfo = $this->getPathInfo();
             if ($pathInfo) {
                 $result = $this->parseUrl($pathInfo);
             } else {
@@ -450,6 +436,14 @@ class UrlManager extends \yii\web\UrlManager
                 }
             }
         }
+    }
+
+    /**
+     * @return string
+     */
+    public function getPathInfo()
+    {
+        return $this->_pathInfo;
     }
 
     /**
