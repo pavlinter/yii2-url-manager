@@ -12,6 +12,7 @@ use Yii;
 use yii\db\Query;
 use yii\helpers\ArrayHelper;
 use yii\web\NotFoundHttpException;
+use yii\web\UrlNormalizer;
 
 /**
  *
@@ -42,6 +43,27 @@ class UrlManager extends \yii\web\UrlManager
      * specified via [[rules]] will take precedence when the same property of the rule is configured.
      */
     public $ruleConfig = ['class' => 'pavlinter\urlmanager\UrlRule'];
+
+    /**
+     * @var UrlNormalizer|array|string|false the configuration for [[UrlNormalizer]] used by this UrlManager.
+     * The default value is `false`, which means normalization will be skipped.
+     * If you wish to enable URL normalization, you should configure this property manually.
+     * For example:
+     *
+     * ```php
+     * [
+     *     'class' => 'yii\web\UrlNormalizer',
+     *     'collapseSlashes' => true,
+     *     'normalizeTrailingSlash' => true,
+     * ]
+     * ```
+     *
+     * @since 2.0.10
+     */
+    public $normalizer = [
+        'class' => 'yii\web\UrlNormalizer',
+        'action' => UrlNormalizer::ACTION_REDIRECT_TEMPORARY,
+    ];
 
     public $normalized = false;
 
