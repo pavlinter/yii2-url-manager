@@ -12,7 +12,6 @@ use Yii;
 use yii\db\Query;
 use yii\helpers\ArrayHelper;
 use yii\web\NotFoundHttpException;
-use yii\web\Request;
 
 /**
  *
@@ -37,6 +36,12 @@ class UrlManager extends \yii\web\UrlManager
     public $table = '{{%language}}';
     public $condition = ['active' => 1];
     public $orderBy = ['weight' => SORT_ASC];
+
+    /**
+     * @var array the default configuration of URL rules. Individual rule configurations
+     * specified via [[rules]] will take precedence when the same property of the rule is configured.
+     */
+    public $ruleConfig = ['class' => 'pavlinter\urlmanager\UrlRule'];
 
     public $normalized = false;
 
@@ -114,7 +119,7 @@ class UrlManager extends \yii\web\UrlManager
 
     /**
      * Parses the user request.
-     * @param Request $request the request component
+     * @param \yii\web\Request $request the request component
      * @return array|boolean the route and the associated parameters. The latter is always empty
      * if [[enablePrettyUrl]] is false. False is returned if the current request cannot be successfully parsed.
      */
@@ -216,27 +221,50 @@ class UrlManager extends \yii\web\UrlManager
         $baseUrl = $this->showScriptName || !$this->enablePrettyUrl ? $this->getScriptUrl() : $this->getBaseUrl();
 
         if ($this->enablePrettyUrl) {
-            /* @var $rule UrlRule */
-            foreach ($this->rules as $rule) {
-                if (($url = $rule->createUrl($this, $route, $params)) !== false) {
-                    if (strpos($url, '://') !== false) {
-                        if ($baseUrl !== '' && ($pos = strpos($url, '/', 8)) !== false) {
-                            return substr($url, 0, $pos) . $baseUrl . substr($url, $pos);
-                        } else {
-                            return $url . $baseUrl . $anchor;
-                        }
-                    } else {
-                        return "$baseUrl/{$url}{$anchor}";
+            $cacheKey = $route . '?';
+            foreach ($params as $key => $value) {
+                if ($value !== null) {
+                    $cacheKey .= $key . '&';
+                }
+            }
+
+            $url = $this->getUrlFromCache($cacheKey, $route, $params);
+            if ($url === false) {
+                $cacheable = true;
+                foreach ($this->rules as $rule) {
+                    /* @var $rule UrlRule */
+                    if (!empty($rule->defaults) && $rule->mode !== UrlRule::PARSING_ONLY) {
+                        // if there is a rule with default values involved, the matching result may not be cached
+                        $cacheable = false;
                     }
+
+                    if (($url = $rule->createUrl($this, $route, $params)) !== false) {
+                        if ($cacheable) {
+                            $this->setRuleToCache($cacheKey, $rule);
+                        }
+                        break;
+                    }
+                }
+            }
+
+            if ($url !== false) {
+                if (strpos($url, '://') !== false) {
+                    if ($baseUrl !== '' && ($pos = strpos($url, '/', 8)) !== false) {
+                        return substr($url, 0, $pos) . $baseUrl . substr($url, $pos) . $anchor;
+                    } else {
+                        return $url . $baseUrl . $anchor;
+                    }
+                } else {
+                    return "$baseUrl/{$url}{$anchor}";
                 }
             }
 
             if ($this->enableLang) {
                 if (isset($params[$this->langParam])) {
-                    $route = $params[$this->langParam].'/'.$route;
+                    $route = $params[$this->langParam] . '/' . $route;
                     unset($params[$this->langParam]);
                 } else {
-                    $route = Yii::$app->language.'/'.$route;
+                    $route = Yii::$app->language . '/' . $route;
                 }
             }
 
@@ -258,7 +286,7 @@ class UrlManager extends \yii\web\UrlManager
             if (!empty($gets) && ($q = http_build_query($gets)) !== '') {
                 $query .= '?' . $q;
             }
-            
+
             if ($this->suffix !== null) {
                 return "$baseUrl/{$route}{$this->suffix}{$query}{$anchor}";
             } else {

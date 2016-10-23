@@ -11,6 +11,7 @@ namespace pavlinter\urlmanager;
 use Yii;
 use yii\base\InvalidConfigException;
 use yii\helpers\ArrayHelper;
+use yii\web\UrlNormalizer;
 
 /**
  *
@@ -35,6 +36,8 @@ class UrlRule extends \yii\web\UrlRule
      * @var array list of parameters used in the route.
      */
     private $_routeParams = [];
+
+
     /**
      * Initializes this rule.
      */
@@ -45,6 +48,13 @@ class UrlRule extends \yii\web\UrlRule
         }
         if ($this->route === null) {
             throw new InvalidConfigException('UrlRule::route must be set.');
+        }
+        if (is_array($this->normalizer)) {
+            $normalizerConfig = array_merge(['class' => UrlNormalizer::className()], $this->normalizer);
+            $this->normalizer = Yii::createObject($normalizerConfig);
+        }
+        if ($this->normalizer !== null && $this->normalizer !== false && !$this->normalizer instanceof UrlNormalizer) {
+            throw new InvalidConfigException('Invalid config for UrlRule::normalizer.');
         }
         if ($this->verb !== null) {
             if (is_array($this->verb)) {
@@ -60,6 +70,7 @@ class UrlRule extends \yii\web\UrlRule
         }
 
         $this->pattern = trim($this->pattern, '/');
+        $this->route = trim($this->route, '/');
 
         if ($this->host !== null) {
             $this->host = rtrim($this->host, '/');
@@ -79,8 +90,7 @@ class UrlRule extends \yii\web\UrlRule
             $this->pattern = '/' . $this->pattern . '/';
         }
 
-        $this->route = trim($this->route, '/');
-        if (strpos($this->route, '<') !== false && preg_match_all('/<(\w+)>/', $this->route, $matches)) {
+        if (strpos($this->route, '<') !== false && preg_match_all('/<([\w._-]+)>/', $this->route, $matches)) {
             foreach ($matches[1] as $name) {
                 $this->_routeParams[$name] = "<$name>";
             }
@@ -95,33 +105,37 @@ class UrlRule extends \yii\web\UrlRule
             '(' => '\\(',
             ')' => '\\)',
         ];
+
         $tr2 = [];
-        if (preg_match_all('/<(\w+):?([^>]+)?>/', $this->pattern, $matches, PREG_OFFSET_CAPTURE | PREG_SET_ORDER)) {
+        if (preg_match_all('/<([\w._-]+):?([^>]+)?>/', $this->pattern, $matches, PREG_OFFSET_CAPTURE | PREG_SET_ORDER)) {
             foreach ($matches as $match) {
                 $name = $match[1][0];
                 $pattern = isset($match[2][0]) ? $match[2][0] : '[^\/]+';
+                $placeholder = 'a' . hash('crc32b', $name); // placeholder must begin with a letter
+                $this->placeholders[$placeholder] = $name;
                 if (array_key_exists($name, $this->defaults)) {
                     $length = strlen($match[0][0]);
                     $offset = $match[0][1];
-                    if ($offset > 1 && $this->pattern[$offset - 1] === '/' && $this->pattern[$offset + $length] === '/') {
-                        $tr["/<$name>"] = "(/(?P<$name>$pattern))?";
+                    if ($offset > 1 && $this->pattern[$offset - 1] === '/' && (!isset($this->pattern[$offset + $length]) || $this->pattern[$offset + $length] === '/')) {
+                        $tr["/<$name>"] = "(/(?P<$placeholder>$pattern))?";
                     } else {
-                        $tr["<$name>"] = "(?P<$name>$pattern)?";
+                        $tr["<$name>"] = "(?P<$placeholder>$pattern)?";
                     }
                 } else {
-                    $tr["<$name>"] = "(?P<$name>$pattern)";
+                    $tr["<$name>"] = "(?P<$placeholder>$pattern)";
                 }
                 if (isset($this->_routeParams[$name])) {
-                    $tr2["<$name>"] = "(?P<$name>$pattern)";
+                    $tr2["<$name>"] = "(?P<$placeholder>$pattern)";
                 } else {
-                    $this->_paramRules[$name] = $pattern === '[^\/]+' ? '' : "#^$pattern$#";
+                    $this->_paramRules[$name] = $pattern === '[^\/]+' ? '' : "#^$pattern$#u";
                 }
             }
         }
 
-        $this->_template = preg_replace('/<(\w+):?([^>]+)?>/', '<$1>', $this->pattern);
-        $this->pattern = '#^' . trim(strtr($this->_template, $tr), '/') . '$#u';
 
+
+        $this->_template = preg_replace('/<([\w._-]+):?([^>]+)?>/', '<$1>', $this->pattern);
+        $this->pattern = '#^' . trim(strtr($this->_template, $tr), '/') . '$#u';
         if (!empty($this->_routeParams)) {
             $this->_routeRule = '#^' . strtr($this->route, $tr2) . '$#u';
         }
@@ -129,7 +143,7 @@ class UrlRule extends \yii\web\UrlRule
     /**
      * Parses the given request and returns the corresponding route and parameters.
      * @param UrlManager $manager the URL manager
-     * @param Request $request the request component
+     * @param \yii\web\Request $request the request component
      * @return array|boolean the parsing result. The route and the parameters are returned as an array.
      * If false, it means this rule cannot be used to parse this path info.
      */
@@ -143,7 +157,12 @@ class UrlRule extends \yii\web\UrlRule
             return false;
         }
 
+        $suffix = (string)($this->suffix === null ? $manager->suffix : $this->suffix);
         $pathInfo = $request->getPathInfo();
+        $normalized = false;
+        if ($this->hasNormalizer($manager)) {
+            $pathInfo = $this->getNormalizer($manager)->normalizePathInfo($pathInfo, $suffix, $normalized);
+        }
 
         $pathInfoParams = [];
         if ($this->paramsAfter !== null && strpos($pathInfo, '/') !== false) {
@@ -155,7 +174,6 @@ class UrlRule extends \yii\web\UrlRule
             }
         }
 
-        $suffix = (string) ($this->suffix === null ? $manager->suffix : $this->suffix);
         if ($suffix !== '' && $pathInfo !== '') {
             $n = strlen($suffix);
             if (substr_compare($pathInfo, $suffix, -$n, $n) === 0) {
@@ -176,6 +194,8 @@ class UrlRule extends \yii\web\UrlRule
         if (!preg_match($this->pattern, $pathInfo, $matches)) {
             return false;
         }
+
+        $matches = $this->substitutePlaceholderNames($matches);
 
         foreach ($this->defaults as $name => $value) {
             if (!isset($matches[$name]) || $matches[$name] === '') {
@@ -201,7 +221,13 @@ class UrlRule extends \yii\web\UrlRule
 
         Yii::trace("Request parsed with URL rule: {$this->name}", __METHOD__);
 
-        return [$route, $params];
+
+        if ($normalized) {
+            // pathInfo was changed by normalizer - we need also normalize route
+            return $this->getNormalizer($manager)->normalizeRoute([$route, $params]);
+        } else {
+            return [$route, $params];
+        }
     }
     /**
      * Creates a URL according to the given route and parameters.
@@ -215,10 +241,13 @@ class UrlRule extends \yii\web\UrlRule
         if ($this->mode === self::PARSING_ONLY) {
             return false;
         }
+
         $tr = [];
+
         // match the route part first
         if ($route !== $this->route) {
             if ($this->_routeRule !== null && preg_match($this->_routeRule, $route, $matches)) {
+                $matches = $this->substitutePlaceholderNames($matches);
                 foreach ($this->_routeParams as $name => $token) {
                     if (isset($this->defaults[$name]) && strcmp($this->defaults[$name], $matches[$name]) === 0) {
                         $tr[$token] = '';
@@ -227,6 +256,7 @@ class UrlRule extends \yii\web\UrlRule
                     }
                 }
             } else {
+
                 return false;
             }
         }
@@ -262,7 +292,6 @@ class UrlRule extends \yii\web\UrlRule
         }
 
         $url = trim(strtr($this->_template, $tr), '/');
-
         if ($this->host !== null) {
             $pos = strpos($url, '/', 8);
             if ($pos !== false) {
@@ -271,9 +300,11 @@ class UrlRule extends \yii\web\UrlRule
         } elseif (strpos($url, '//') !== false) {
             $url = preg_replace('#/+#', '/', $url);
         }
+
         if ($url !== '') {
             $url .= ($this->suffix === null ? $manager->suffix : $this->suffix);
         }
+
         if ($manager->enableLang) {
             if (isset($params[$manager->langParam])) {
                 $url = $params[$manager->langParam].'/'.$url;
