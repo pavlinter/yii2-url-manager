@@ -16,7 +16,20 @@ use yii\base\Event;
 class UrlManagerEvent extends Event
 {
     /**
+     * For UrlManager::EVENT_INIT event
      * @var string
      */
     public $pathInfo;
+
+    /**
+     * For UrlManager::EVENT_BEFORE_CONTROLLER event
+     * @var string
+     */
+    public $router;
+
+    /**
+     * For UrlManager::EVENT_BEFORE_CONTROLLER event
+     * @var array
+     */
+    public $params;
 }

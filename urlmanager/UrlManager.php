@@ -20,6 +20,7 @@ use yii\web\NotFoundHttpException;
 class UrlManager extends \yii\web\UrlManager
 {
     const EVENT_INIT = 'init';
+    const EVENT_BEFORE_CONTROLLER = 'beforeController';
 
     public $enableLang = false;
     public $langParam  = 'lang';
@@ -36,6 +37,12 @@ class UrlManager extends \yii\web\UrlManager
     public $table = '{{%language}}';
     public $condition = ['active' => 1];
     public $orderBy = ['weight' => SORT_ASC];
+
+    /**
+     * @var string the current module name. If it is have submodule, then name is "name/subname"
+     * If it is frontend, then $moduleName == null
+     */
+    public $moduleName;
 
     /**
      * @var array the default configuration of URL rules. Individual rule configurations
@@ -114,7 +121,7 @@ class UrlManager extends \yii\web\UrlManager
             'pathInfo' => $pathInfo,
         ]);
 
-        $this->trigger(self::EVENT_INIT, $event);
+        $this->trigger(static::EVENT_INIT, $event);
 
         if (isset($_GET)) {
             foreach ($_GET as $k => $v) {
@@ -138,7 +145,22 @@ class UrlManager extends \yii\web\UrlManager
 
             foreach ($this->rules as $rule) {
                 if (($result = $rule->parseRequest($this, $request)) !== false) {
-                    return $result;
+                    list($router, $params) = $result;
+                    if (strpos($router, '/') !== false) {
+                        $segments = explode('/', $router);
+                        $n = count($segments);
+                        if($n > 2){
+                            //set Module name
+                            $this->setModuleName(implode('/', array_slice($segments , 0, $n - 2)));
+                        }
+                    }
+
+                    $event = new UrlManagerEvent([
+                        'router' => $router,
+                        'params' => $params,
+                    ]);
+                    $this->trigger(static::EVENT_BEFORE_CONTROLLER, $event);
+                    return [$event->router, $event->params];
                 }
             }
 
@@ -155,10 +177,15 @@ class UrlManager extends \yii\web\UrlManager
             }
 
             if ($this->normalized) {
-                return $this->normalizer->normalizeRoute($result);
-            } else {
-                return $result;
+                $result = $this->normalizer->normalizeRoute($result);
             }
+            list($router, $params) = $result;
+            $event = new UrlManagerEvent([
+                'router' => $router,
+                'params' => $params,
+            ]);
+            $this->trigger(static::EVENT_BEFORE_CONTROLLER, $event);
+            return [$event->router, $event->params];
         } else {
             Yii::trace('Pretty URL not enabled. Using default URL parsing logic.', __METHOD__);
             $route = $request->getQueryParam($this->routeParam, '');
@@ -197,7 +224,15 @@ class UrlManager extends \yii\web\UrlManager
                     break;
                 }
             }
+
+            if($n > 2){
+                //set Module name
+                $this->setModuleName(implode('/', array_slice($segments , 0, $pathInfoStart - 2)));
+            }
+
+
             if ( $n > $pathInfoStart){
+
                 $pathInfo = implode('/', array_slice($segments,0, $pathInfoStart));
                 $segments = array_slice($segments,$pathInfoStart);
                 $params = $this->createPrettyUrl($segments);
@@ -452,5 +487,21 @@ class UrlManager extends \yii\web\UrlManager
     public function getDb()
     {
         return Yii::$app->get($this->db);
+    }
+
+    /**
+     *
+     */
+    public function getModuleName()
+    {
+        return $this->moduleName;
+    }
+
+    /**
+     * @param $name
+     */
+    public function setModuleName($name)
+    {
+        $this->moduleName = $name;
     }
 }
