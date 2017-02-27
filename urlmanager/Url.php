@@ -58,15 +58,16 @@ class Url extends \yii\helpers\BaseUrl
 
     /**
      * @param string $params
+     * @param bool $scheme
      * @return string
      */
-    public static function getLangUrl($params = '')
+    public static function getLangUrl($params = '', $scheme = false)
     {
         $langBegin = Yii::$app->getUrlManager()->langBegin;
         if (isset($langBegin['0']) && $langBegin['0'] === Yii::$app->language) {
-            return Url::to('@web/' . $params);
+            return Url::to('@web/' . $params, $scheme);
         } else {
-            return Url::to('@web/' . Yii::$app->language . '/' . $params);
+            return Url::to('@web/' . Yii::$app->language . '/' . $params, $scheme);
         }
     }
 }
