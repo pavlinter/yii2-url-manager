@@ -23,6 +23,8 @@ class UrlManager extends \yii\web\UrlManager
     const EVENT_BEFORE_CONTROLLER = 'beforeController';
 
     public $enableLang = false;
+    public $enableCookieLang = false;
+    public $cookieLangName = 'lang';
     public $langParam  = 'lang';
     public $onlyFriendlyParams = false;
     public $gets = [];
@@ -59,7 +61,7 @@ class UrlManager extends \yii\web\UrlManager
 	 */
 	public function init()
 	{
-        parent::init();
+        $this->baseInit();
         if (Yii::$app->request->getIsConsoleRequest()) {
             return true;
         }
@@ -106,14 +108,28 @@ class UrlManager extends \yii\web\UrlManager
                     $_GET[$this->langParam] = $segments['0'];
                     unset($segments['0']);
                     $pathInfo = join('/', $segments);
+                    if ($this->enableCookieLang) {
+                        $this->setCookieLang($_GET[$this->langParam]);
+                    }
                 } else if(in_array($pathInfo, $this->langBegin)) {
-
                     $_GET[$this->langParam] = $pathInfo;
                     $pathInfo = '';
+                    if ($this->enableCookieLang) {
+                        $this->setCookieLang($_GET[$this->langParam]);
+                    }
                 }
 
             } else {
-                $_GET[$this->langParam] = reset($this->langBegin);
+                if ($this->enableCookieLang) {
+                    $cookieLang =  $this->getCookieLang();
+                    if ($cookieLang !== false) {
+                        $_GET[$this->langParam] = $cookieLang;
+                    } else {
+                        $_GET[$this->langParam] = reset($this->langBegin);
+                    }
+                } else {
+                    $_GET[$this->langParam] = reset($this->langBegin);
+                }
             }
 		}
 
@@ -129,7 +145,7 @@ class UrlManager extends \yii\web\UrlManager
             }
         }
         $request->setPathInfo($event->pathInfo . $endSlash);
-        $this->_pathInfo = $event->pathInfo;
+        $this->setPathInfo($event->pathInfo);
 	}
 
     /**
@@ -474,11 +490,27 @@ class UrlManager extends \yii\web\UrlManager
     }
 
     /**
+     *
+     */
+    public function baseInit()
+    {
+        return parent::init();
+    }
+
+    /**
      * @return string
      */
     public function getPathInfo()
     {
         return $this->_pathInfo;
+    }
+
+    /**
+     * @param $value
+     */
+    public function setPathInfo($value)
+    {
+        $this->_pathInfo = $value;
     }
 
     /**
@@ -503,5 +535,34 @@ class UrlManager extends \yii\web\UrlManager
     public function setModuleName($name)
     {
         $this->moduleName = $name;
+    }
+
+    /**
+     * @return bool
+     */
+    public function getCookieLang()
+    {
+        $cookies = Yii::$app->request->cookies;
+        $language = $cookies->getValue($this->cookieLangName);
+        if ($language !== null) {
+            $key = array_search($language, $this->langBegin);
+            if ($key !== false) {
+                return $this->langBegin[$key];
+            }
+        }
+        return false;
+    }
+
+    /**
+     * @param $lang
+     */
+    public function setCookieLang($lang)
+    {
+        $cookies = Yii::$app->response->cookies;
+        $cookies->add(new \yii\web\Cookie([
+            'name' => $this->cookieLangName,
+            'value' => $lang,
+            'expire' => time() + 86400 * 30,
+        ]));
     }
 }
